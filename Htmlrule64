@@ -1,1 +1,1359 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Network Architect: Wi-Fi Puzzle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --qual-standard: #e5e7eb;
+            --qual-standard-border: #9ca3af;
+            --qual-good: #e9d5ff;
+            --qual-good-border: #a855f7;
+            --qual-high: #fef08a;
+            --qual-high-border: #eab308;
+            --qual-premium: #fecaca;
+            --qual-premium-border: #ef4444;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            overflow: hidden; /* Prevent body scroll, handle inside containers */
+            touch-action: none; /* Prevent pinch zoom on mobile */
+        }
+        
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
 
+        /* Game Board Grid */
+        #game-board-container {
+            background-size: 40px 40px;
+            background-image: 
+                linear-gradient(to right, #1e293b 1px, transparent 1px),
+                linear-gradient(to bottom, #1e293b 1px, transparent 1px);
+            position: relative;
+        }
+
+        /* Quality Backgrounds */
+        .q-bg-0 { background-color: var(--qual-standard); color: #1f2937; border: 2px solid var(--qual-standard-border); }
+        .q-bg-1 { background-color: var(--qual-good); color: #4c1d95; border: 2px solid var(--qual-good-border); }
+        .q-bg-2 { background-color: var(--qual-high); color: #713f12; border: 2px solid var(--qual-high-border); }
+        .q-bg-3 { background-color: var(--qual-premium); color: #7f1d1d; border: 2px solid var(--qual-premium-border); }
+
+        .q-text-0 { color: #9ca3af; }
+        .q-text-1 { color: #a855f7; }
+        .q-text-2 { color: #eab308; }
+        .q-text-3 { color: #ef4444; }
+
+        /* Animations */
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        .anim-pulse { animation: pulse-border 2s infinite; }
+        
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Cable Line */
+        .cable-line {
+            stroke-dasharray: 10;
+            animation: dash 1s linear infinite;
+        }
+        @keyframes dash { to { stroke-dashoffset: -20; } }
+
+        /* Minigame Wires */
+        .wire-slot { min-height: 40px; }
+        .wire-drag { cursor: grab; transition: transform 0.1s; }
+        .wire-drag:active { cursor: grabbing; transform: scale(1.1); }
+        
+        /* Game Nodes */
+        .game-node {
+            position: absolute;
+            width: 40px; height: 40px;
+            display: flex; justify-content: center; align-items: center;
+            border-radius: 8px; cursor: pointer;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            user-select: none;
+            z-index: 10;
+            transition: transform 0.1s;
+        }
+        .game-node:active { transform: scale(0.95); }
+        .game-node .badge {
+            position: absolute; top: -5px; right: -5px;
+            font-size: 0.6rem; padding: 2px 4px; border-radius: 999px;
+            background: #ef4444; color: white;
+        }
+        .node-router { background: linear-gradient(135deg, #3b82f6, #2563eb); border: 2px solid #60a5fa; }
+        .node-switch { background: linear-gradient(135deg, #8b5cf6, #7c3aed); border: 2px solid #a78bfa; }
+        .node-ap { background: linear-gradient(135deg, #10b981, #059669); border: 2px solid #34d399; }
+        .node-pc { background: #475569; border: 2px solid #94a3b8; }
+        .node-phone { background: #334155; border: 2px solid #64748b; border-radius: 50%; width: 30px; height: 30px; }
+        .node-wall { background: #334155; position: absolute; z-index: 5; }
+        .node-internet { background: #f59e0b; border: 2px solid #fbbf24; border-radius: 50%; z-index: 9;}
+
+        /* Modals */
+        .modal-bg { background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); }
+        
+        /* Minigame Tools */
+        #cut-line { display: none; position: absolute; height: 100%; width: 2px; background: red; top: 0; pointer-events: none;}
+    </style>
+</head>
+<body class="w-screen h-screen flex flex-col text-sm md:text-base">
+
+    <header class="h-14 bg-slate-800 border-b border-slate-700 flex justify-between items-center px-4 shrink-0 z-50 shadow-md">
+        <div class="flex items-center gap-2">
+            <i class="fas fa-network-wired text-blue-400 text-xl"></i>
+            <h1 class="font-bold text-lg hidden sm:block tracking-wide">Network Architect</h1>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="bg-slate-900 px-4 py-1.5 rounded-full border border-slate-700 flex items-center gap-2">
+                <i class="fas fa-coins text-yellow-400"></i>
+                <span id="player-money" class="font-bold text-yellow-400 font-mono text-lg">3,000</span>
+            </div>
+        </div>
+    </header>
+
+    <main id="app-container" class="flex-1 relative overflow-hidden">
+        
+        <!-- Screen: Main Menu -->
+        <section id="screen-main" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 z-10 fade-in">
+            <div class="text-center mb-10">
+                <i class="fas fa-wifi text-6xl text-blue-500 mb-4 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]"></i>
+                <h2 class="text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">Wi-Fi Setup Puzzle</h2>
+                <p class="text-slate-400 mt-2">ออกแบบ ติดตั้ง และต่อระบบเครือข่ายให้สมบูรณ์</p>
+            </div>
+            <div class="flex flex-col gap-4 w-64">
+                <button onclick="showScreen('level-select')" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-transform transform hover:scale-105 flex items-center justify-center gap-2">
+                    <i class="fas fa-play"></i> เข้าเกม
+                </button>
+                <button onclick="showScreen('shop')" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-transform transform hover:scale-105 flex items-center justify-center gap-2">
+                    <i class="fas fa-box-open"></i> อุปกรณ์ / ร้านค้า
+                </button>
+                <button onclick="confirmReset()" class="bg-slate-700 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-transform transform hover:scale-105 flex items-center justify-center gap-2">
+                    <i class="fas fa-trash-alt"></i> รีเซ็ตข้อมูล
+                </button>
+            </div>
+        </section>
+
+        <!-- Screen: Shop & Inventory -->
+        <section id="screen-shop" class="absolute inset-0 bg-slate-900 hidden z-10 flex flex-col">
+            <div class="p-4 bg-slate-800 flex justify-between items-center shadow-md">
+                <button onclick="showScreen('main')" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg flex items-center gap-2 transition">
+                    <i class="fas fa-arrow-left"></i> กลับ
+                </button>
+                <div class="flex gap-2 bg-slate-900 p-1 rounded-lg">
+                    <button id="tab-inventory" onclick="switchShopTab('inventory')" class="px-4 py-2 rounded-md bg-blue-600 font-bold transition">คลังไอเทม</button>
+                    <button id="tab-store" onclick="switchShopTab('store')" class="px-4 py-2 rounded-md hover:bg-slate-700 transition">ร้านค้า</button>
+                    <button id="tab-craft" onclick="switchShopTab('craft')" class="px-4 py-2 rounded-md hover:bg-slate-700 transition"><i class="fas fa-tools"></i> เข้าหัว LAN</button>
+                </div>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-4 md:p-6" id="shop-content">
+                <!-- Content injected via JS -->
+            </div>
+        </section>
+
+        <!-- Screen: Level Select -->
+        <section id="screen-level-select" class="absolute inset-0 bg-slate-900 hidden z-10 flex flex-col">
+            <div class="p-4 bg-slate-800 flex items-center shadow-md">
+                <button onclick="showScreen('main')" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg flex items-center gap-2 transition">
+                    <i class="fas fa-arrow-left"></i> กลับ
+                </button>
+                <h2 class="text-xl font-bold ml-4">เลือกด่าน</h2>
+            </div>
+            <div class="flex-1 flex flex-col items-center justify-center gap-6 p-4">
+                <button onclick="startLevel(0)" class="w-full max-w-md bg-emerald-700 hover:bg-emerald-600 p-6 rounded-2xl flex items-center justify-between shadow-lg transition transform hover:-translate-y-1">
+                    <div class="text-left">
+                        <h3 class="text-2xl font-bold">ด่านง่าย (Easy)</h3>
+                        <p class="text-emerald-200">เป้าหมาย: 3,000 คะแนน | อาคาร 1 ชั้น</p>
+                    </div>
+                    <i class="fas fa-building text-4xl text-emerald-400 opacity-50"></i>
+                </button>
+                <button onclick="startLevel(1)" class="w-full max-w-md bg-orange-700 hover:bg-orange-600 p-6 rounded-2xl flex items-center justify-between shadow-lg transition transform hover:-translate-y-1">
+                    <div class="text-left">
+                        <h3 class="text-2xl font-bold">ด่านกลาง (Normal)</h3>
+                        <p class="text-orange-200">เป้าหมาย: 6,000 คะแนน | อาคาร 2-3 ชั้น</p>
+                    </div>
+                    <i class="fas fa-city text-4xl text-orange-400 opacity-50"></i>
+                </button>
+                <button onclick="startLevel(2)" class="w-full max-w-md bg-red-800 hover:bg-red-700 p-6 rounded-2xl flex items-center justify-between shadow-lg transition transform hover:-translate-y-1">
+                    <div class="text-left">
+                        <h3 class="text-2xl font-bold">ด่านยาก (Hard)</h3>
+                        <p class="text-red-200">เป้าหมาย: 12,000 คะแนน | อาคาร 2-4 ชั้น</p>
+                    </div>
+                    <i class="fas fa-industry text-4xl text-red-400 opacity-50"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- Screen: Game Board -->
+        <section id="screen-game" class="absolute inset-0 bg-slate-900 hidden flex flex-col md:flex-row z-10">
+            <!-- Left Panel: Game Inventory / Tools -->
+            <div class="w-full md:w-80 bg-slate-800 flex flex-col border-r border-slate-700 z-20 shadow-xl h-48 md:h-full order-2 md:order-1">
+                <div class="p-3 bg-slate-900 border-b border-slate-700 flex justify-between items-center">
+                    <div>
+                        <div class="text-xs text-slate-400">เป้าหมาย</div>
+                        <div class="font-bold text-emerald-400 text-lg" id="game-target-score">0 pts</div>
+                    </div>
+                    <button onclick="abandonLevel()" class="text-red-400 hover:text-red-300 px-2 py-1"><i class="fas fa-times"></i> ออก</button>
+                </div>
+                
+                <div class="flex p-2 gap-2 bg-slate-800">
+                    <button id="tool-place" onclick="setTool('place')" class="flex-1 bg-blue-600 py-1.5 rounded text-sm font-bold shadow"><i class="fas fa-hand-pointer"></i> วางอุปกรณ์</button>
+                    <button id="tool-wire" onclick="setTool('wire')" class="flex-1 bg-slate-700 py-1.5 rounded text-sm font-bold shadow"><i class="fas fa-plug"></i> ต่อสาย</button>
+                    <button id="tool-delete" onclick="setTool('delete')" class="flex-1 bg-slate-700 py-1.5 rounded text-sm font-bold shadow"><i class="fas fa-eraser"></i> ลบ</button>
+                </div>
+
+                <div id="game-inventory-list" class="flex-1 overflow-y-auto p-2 space-y-2">
+                    <!-- Inventory items for placement -->
+                </div>
+
+                <div class="p-3 bg-slate-900 border-t border-slate-700">
+                    <button onclick="testNetwork()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg shadow-lg flex items-center justify-center gap-2 anim-pulse">
+                        <i class="fas fa-check-circle"></i> ตรวจสอบระบบ
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Panel: Grid -->
+            <div class="flex-1 relative overflow-auto bg-slate-950 order-1 md:order-2" id="board-scroll-area">
+                <div id="game-board-container" class="w-[1200px] h-[1200px] transform origin-top-left">
+                    <!-- SVG for Cables -->
+                    <svg id="cables-svg" class="absolute inset-0 w-full h-full pointer-events-none z-10">
+                        <defs>
+                            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                <polygon points="0 0, 10 3.5, 0 7" fill="#60a5fa" />
+                            </marker>
+                        </defs>
+                    </svg>
+                    <!-- Elements (Nodes/Walls) injected here -->
+                </div>
+            </div>
+            
+            <!-- Connection UI (Floating) -->
+            <div id="connection-ui" class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-slate-800 border border-blue-500 p-4 rounded-xl shadow-2xl hidden z-50">
+                <div class="text-center font-bold mb-2">เลือกสาย LAN เพื่อเชื่อมต่อ</div>
+                <div class="text-xs text-slate-400 mb-2 text-center" id="connection-nodes-info">Node A ➔ Node B</div>
+                <div id="connection-cables-list" class="max-h-40 overflow-y-auto space-y-1"></div>
+                <button onclick="cancelConnection()" class="mt-2 w-full bg-slate-700 py-1 rounded text-sm">ยกเลิก</button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal: Generic Alert / Confirm -->
+    <div id="modal-alert" class="absolute inset-0 modal-bg hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-600 p-6 rounded-2xl max-w-md w-full shadow-2xl transform transition-transform scale-95" id="modal-alert-content">
+            <h3 id="modal-title" class="text-xl font-bold mb-2 text-white">หัวข้อ</h3>
+            <p id="modal-desc" class="text-slate-300 mb-6 whitespace-pre-wrap">รายละเอียด</p>
+            <div id="modal-buttons" class="flex justify-end gap-3">
+                <!-- Buttons injected -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Minigame (Cable Crafting) -->
+    <div id="modal-minigame" class="absolute inset-0 modal-bg hidden z-[60] flex items-center justify-center p-2">
+        <div class="bg-slate-900 border-2 border-blue-500 rounded-xl w-full max-w-2xl h-[90vh] flex flex-col shadow-2xl relative overflow-hidden">
+            <div class="bg-blue-600 text-white p-3 font-bold flex justify-between items-center shadow-md">
+                <span><i class="fas fa-tools"></i> เข้าหัว LAN</span>
+                <button onclick="closeMinigame()" class="hover:bg-blue-700 px-2 rounded"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="p-2 bg-slate-800 text-center text-sm font-semibold border-b border-slate-700" id="mg-instruction">
+                คำสั่ง
+            </div>
+            <div class="flex-1 relative bg-slate-800 overflow-hidden flex items-center justify-center" id="mg-area">
+                <!-- Interactive elements injected here -->
+            </div>
+            <div class="p-4 bg-slate-900 border-t border-slate-700 flex justify-between items-center">
+                <div class="text-xs text-slate-400 w-1/3">ความเสียหาย: <span id="mg-damage" class="text-red-400 font-bold">0%</span></div>
+                <div class="w-1/3 text-center" id="mg-step-indicator">Step 1/6</div>
+                <div class="w-1/3 text-right">
+                    <button id="mg-btn-action" class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded font-bold shadow hidden">ต่อไป</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Network Results -->
+    <div id="modal-results" class="absolute inset-0 modal-bg hidden z-[60] flex items-center justify-center p-4">
+        <div class="bg-slate-800 border-2 border-slate-600 rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b border-slate-700 text-center relative" id="result-header">
+                <h2 class="text-3xl font-extrabold" id="result-title">ผลลัพธ์</h2>
+            </div>
+            <div class="p-4 flex-1 overflow-y-auto space-y-4 text-sm" id="result-details">
+                <!-- Diagnostics -->
+            </div>
+            <div class="p-4 border-t border-slate-700 bg-slate-900 flex justify-between items-center rounded-b-2xl">
+                <div class="font-bold text-lg">เงินรางวัล: <span id="result-money" class="text-yellow-400 font-mono">+0</span></div>
+                <div class="flex gap-2">
+                    <button id="btn-result-retry" onclick="restartLevel()" class="bg-orange-600 hover:bg-orange-500 px-4 py-2 rounded font-bold transition hidden">เล่นใหม่</button>
+                    <button onclick="exitLevel()" class="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded font-bold transition">เสร็จสิ้น</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. Constants & Configurations ---
+        const QUALITIES = [
+            { id: 0, name: 'มาตรฐาน', class: 'q-bg-0', textClass: 'q-text-0', multi: 1 },
+            { id: 1, name: 'คุณภาพดี', class: 'q-bg-1', textClass: 'q-text-1', multi: 2 },
+            { id: 2, name: 'คุณภาพสูง', class: 'q-bg-2', textClass: 'q-text-2', multi: 4 },
+            { id: 3, name: 'พรีเมี่ยม', class: 'q-bg-3', textClass: 'q-text-3', multi: 8 }
+        ];
+
+        const CABLE_LENGTHS = [1, 3, 5, 10, 20, 50];
+        const HEAD_PACKS = [20, 50, 100];
+
+        // Base configurations for item types
+        const DB = {
+            uncrimped_cable: { type: 'cable_raw', name: 'สาย LAN (ไม่เข้าหัว)', basePrice: 40, unit: 'เมตร', icon: 'fa-tape' },
+            crimped_cable: { type: 'cable_ready', name: 'สาย LAN (เข้าหัวสำเร็จ)', basePrice: 60, unit: 'เมตร', icon: 'fa-ethernet' },
+            head: { type: 'head', name: 'หัวสาย LAN (RJ45)', basePrice: 4, unit: 'ชิ้น', icon: 'fa-plug' },
+            ap_a: { type: 'ap', name: 'Access Point (Brand A)', basePrice: 800, maxUsersBase: 10, icon: 'fa-wifi' },
+            ap_b: { type: 'ap', name: 'Access Point (Brand B)', basePrice: 850, maxUsersBase: 12, icon: 'fa-wifi' },
+            router_a: { type: 'router', name: 'Router (Brand A)', basePrice: 1000, maxDev: [30, 40, 60, 80], maxSpeed: [45, 90, 130, 150], icon: 'fa-server' },
+            router_b: { type: 'router', name: 'Router (Brand B)', basePrice: 1100, maxDev: [35, 45, 65, 85], maxSpeed: [50, 100, 140, 160], icon: 'fa-server' },
+            switch_a: { type: 'switch', name: 'Network Switch (Brand A)', basePricePerPort: 50, configs: [{p:6, u:1}, {p:8, u:2}, {p:9, u:1}, {p:16, u:4}], icon: 'fa-network-wired' },
+            switch_b: { type: 'switch', name: 'Network Switch (Brand B)', basePricePerPort: 55, configs: [{p:6, u:1}, {p:8, u:2}, {p:9, u:1}, {p:16, u:4}], icon: 'fa-network-wired' }
+        };
+
+        // Network Speed thresholds
+        const SPEED = {
+            mobile: { low: 1, med: 4 }, // <1 Low, 1-4 Med, >=4 High
+            pc: { low: 3, med: 8 }      // <3 Low, 3-8 Med, >=8 High
+        };
+        const SCORE = { pcBase: 50, pcMed: 50, pcHigh: 100, pcMax: 100, phoneBase: 100, phoneMed: 50, phoneHigh: 100 };
+        const CABLE_SPEEDS = [90, 200, 500, 1000]; // Speed limit by quality
+
+        // --- 2. State Management ---
+        let state = {
+            money: 3000,
+            inventory: [], // { id, dbId, q, size/port, amount }
+            unlockedLevels: 1
+        };
+
+        let curTab = 'inventory';
+        let mgState = {}; // Minigame state
+
+        // Game Board State
+        let game = {
+            active: false,
+            difficulty: 0,
+            targetScore: 0,
+            nodes: [], // { id, type, x, y, el, portsTotal, portsUsed, data:{} }
+            cables: [], // { id, node1, node2, item: {q, size} }
+            tool: 'place', // place, wire, delete
+            selectedNodeId: null, // For wiring
+            selectedInventoryIdx: null, // For placing
+        };
+
+        // --- STREAMING_CHUNK:Storage & Initialization ---
+        function saveState() {
+            localStorage.setItem('network_game_save', JSON.stringify(state));
+            updateUI();
+        }
+
+        function loadState() {
+            const saved = localStorage.getItem('network_game_save');
+            if (saved) {
+                try { state = JSON.parse(saved); } catch (e) { resetState(); }
+            } else {
+                resetState(false);
+            }
+            updateUI();
+        }
+
+        function resetState(save = true) {
+            state = { money: 3000, inventory: [], unlockedLevels: 1 };
+            // Give starter items
+            addInv('crimped_cable', 0, 10, 5); // 5x 10m std cables
+            addInv('router_a', 0, null, 1);
+            addInv('switch_a', 0, '6+1', 1);
+            if(save) saveState();
+        }
+
+        function updateUI() {
+            document.getElementById('player-money').innerText = state.money.toLocaleString();
+        }
+
+        function generateId() { return Math.random().toString(36).substr(2, 9); }
+
+        window.onload = () => {
+            loadState();
+            showScreen('main');
+        };
+
+        // --- STREAMING_CHUNK:Navigation & Modals ---
+        function showScreen(id) {
+            ['screen-main', 'screen-shop', 'screen-level-select', 'screen-game'].forEach(s => {
+                document.getElementById(s).classList.add('hidden');
+            });
+            document.getElementById(`screen-${id}`).classList.remove('hidden');
+            document.getElementById(`screen-${id}`).classList.add('fade-in');
+            
+            if(id === 'shop') switchShopTab('inventory');
+        }
+
+        function showAlert(title, desc, confirmTxt = 'ตกลง', onConfirm = null, cancelTxt = null, onCancel = null) {
+            const modal = document.getElementById('modal-alert');
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-desc').innerText = desc;
+            
+            let btnsHtml = '';
+            if (cancelTxt) btnsHtml += `<button id="btn-alert-cancel" class="bg-slate-600 hover:bg-slate-500 px-4 py-2 rounded">${cancelTxt}</button>`;
+            btnsHtml += `<button id="btn-alert-confirm" class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded font-bold shadow">${confirmTxt}</button>`;
+            
+            document.getElementById('modal-buttons').innerHTML = btnsHtml;
+            modal.classList.remove('hidden');
+
+            document.getElementById('btn-alert-confirm').onclick = () => {
+                modal.classList.add('hidden');
+                if(onConfirm) onConfirm();
+            };
+            if (cancelTxt) {
+                document.getElementById('btn-alert-cancel').onclick = () => {
+                    modal.classList.add('hidden');
+                    if(onCancel) onCancel();
+                };
+            }
+        }
+
+        function confirmReset() {
+            showAlert('ยืนยันการรีเซ็ต', 'คุณแน่ใจหรือไม่ว่าต้องการรีเซ็ตเกม?\nข้อมูลเงิน ไอเทม และความคืบหน้าทั้งหมดจะถูกลบ', 'ยืนยัน', () => {
+                resetState();
+                showAlert('สำเร็จ', 'รีเซ็ตข้อมูลเรียบร้อยแล้ว');
+            }, 'ยกเลิก');
+        }
+
+        // --- STREAMING_CHUNK:Inventory System ---
+        function addInv(dbId, q, size, amount) {
+            let existing = state.inventory.find(i => i.dbId === dbId && i.q === q && i.size === size);
+            if (existing) {
+                existing.amount += amount;
+            } else {
+                state.inventory.push({ id: generateId(), dbId, q, size, amount });
+            }
+        }
+
+        function removeInvItem(id, amount = 1) {
+            let idx = state.inventory.findIndex(i => i.id === id);
+            if(idx > -1) {
+                state.inventory[idx].amount -= amount;
+                if(state.inventory[idx].amount <= 0) state.inventory.splice(idx, 1);
+                saveState();
+                return true;
+            }
+            return false;
+        }
+
+        function getFullItemInfo(invItem) {
+            const base = DB[invItem.dbId];
+            const qual = QUALITIES[invItem.q];
+            let title = `${base.name} (${qual.name})`;
+            let detail = '';
+            
+            if(base.type === 'cable_raw' || base.type === 'cable_ready') title += ` ${invItem.size}ม.`;
+            if(base.type === 'head') title += ` Pack ${invItem.size}`;
+            if(base.type === 'switch') title += ` ${invItem.size} Port`;
+
+            if(base.type === 'cable_ready') detail = `Speed Limit: ${CABLE_SPEEDS[invItem.q]} Mbps`;
+            if(base.type === 'router') detail = `Max Devices: ${base.maxDev[invItem.q]} | Speed: ${base.maxSpeed[invItem.q]} Mbps`;
+            if(base.type === 'ap') detail = `Max Users: ${base.maxUsersBase * qual.multi}`;
+
+            return { title, detail, qClass: qual.class, icon: base.icon, type: base.type };
+        }
+
+        // --- STREAMING_CHUNK:Shop UI Logic ---
+        function switchShopTab(tab) {
+            curTab = tab;
+            ['tab-inventory', 'tab-store', 'tab-craft'].forEach(t => document.getElementById(t).classList.remove('bg-blue-600', 'font-bold'));
+            document.getElementById(`tab-${tab}`).classList.add('bg-blue-600', 'font-bold');
+            renderShopContent();
+        }
+
+        function renderShopContent() {
+            const container = document.getElementById('shop-content');
+            container.innerHTML = '';
+
+            if (curTab === 'inventory') {
+                if (state.inventory.length === 0) {
+                    container.innerHTML = '<div class="text-center text-slate-500 mt-10">ไม่มีไอเทมในคลัง</div>';
+                    return;
+                }
+                let html = '<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">';
+                state.inventory.forEach(item => {
+                    const info = getFullItemInfo(item);
+                    html += `
+                    <div class="rounded-xl p-4 flex flex-col ${info.qClass} relative overflow-hidden shadow-md">
+                        <div class="absolute top-2 right-2 bg-slate-900 text-white text-xs px-2 py-1 rounded font-bold">x${item.amount}</div>
+                        <i class="fas ${info.icon} text-3xl mb-2 opacity-80"></i>
+                        <h4 class="font-bold text-sm mb-1">${info.title}</h4>
+                        <p class="text-xs opacity-80 mt-auto">${info.detail}</p>
+                    </div>`;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            } 
+            else if (curTab === 'store') {
+                let html = '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">';
+                
+                // Generate Store Items
+                const storeItems = [];
+                Object.keys(DB).forEach(dbId => {
+                    const base = DB[dbId];
+                    QUALITIES.forEach((q, qIdx) => {
+                        if (base.type === 'cable_raw' || base.type === 'cable_ready') {
+                            CABLE_LENGTHS.forEach(len => {
+                                let price = base.basePrice * len * q.multi;
+                                storeItems.push({dbId, qIdx, size: len, price, name: `${base.name} ${len}ม.`});
+                            });
+                        } else if (base.type === 'head') {
+                            HEAD_PACKS.forEach(pack => {
+                                let price = base.basePrice * pack * q.multi;
+                                storeItems.push({dbId, qIdx, size: pack, price, name: `${base.name} Pack ${pack}`});
+                            });
+                        } else if (base.type === 'switch') {
+                            base.configs.forEach(cfg => {
+                                let totalPorts = cfg.p + cfg.u;
+                                let price = base.basePricePerPort * totalPorts * q.multi;
+                                storeItems.push({dbId, qIdx, size: `${cfg.p}+${cfg.u}`, price, name: `${base.name} ${cfg.p}+${cfg.u} Port`});
+                            });
+                        } else {
+                            let price = base.basePrice * q.multi;
+                            storeItems.push({dbId, qIdx, size: null, price, name: base.name});
+                        }
+                    });
+                });
+
+                storeItems.forEach(si => {
+                    const qual = QUALITIES[si.qIdx];
+                    const base = DB[si.dbId];
+                    html += `
+                    <div class="bg-slate-800 rounded-xl p-4 border border-slate-700 flex flex-col shadow-lg">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="px-2 py-0.5 text-xs rounded font-bold ${qual.class}">${qual.name}</div>
+                            <div class="text-yellow-400 font-bold"><i class="fas fa-coins text-sm"></i> ${si.price.toLocaleString()}</div>
+                        </div>
+                        <div class="flex items-center gap-3 mb-2">
+                            <div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center shrink-0">
+                                <i class="fas ${base.icon} text-slate-300"></i>
+                            </div>
+                            <h4 class="font-bold text-sm leading-tight">${si.name}</h4>
+                        </div>
+                        <button onclick="buyItem('${si.dbId}', ${si.qIdx}, '${si.size}', ${si.price})" class="mt-auto w-full bg-blue-600 hover:bg-blue-500 py-2 rounded text-sm font-bold transition flex items-center justify-center gap-2">
+                            <i class="fas fa-cart-plus"></i> ซื้อ
+                        </button>
+                    </div>`;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            }
+            else if (curTab === 'craft') {
+                renderCraftUI(container);
+            }
+        }
+
+        function buyItem(dbId, q, size, price) {
+            size = size === 'null' ? null : isNaN(size) ? size : Number(size);
+            if (state.money >= price) {
+                state.money -= price;
+                addInv(dbId, q, size, 1);
+                saveState();
+                renderShopContent();
+                // small visual feedback
+                document.getElementById('player-money').classList.add('scale-125', 'text-white');
+                setTimeout(()=>document.getElementById('player-money').classList.remove('scale-125', 'text-white'), 200);
+            } else {
+                showAlert('เงินไม่พอ', 'คุณมีเงินไม่พอซื้อไอเทมนี้');
+            }
+        }
+
+        // --- STREAMING_CHUNK:Crafting Minigame UI & Logic ---
+        function renderCraftUI(container) {
+            let rawCables = state.inventory.filter(i => DB[i.dbId].type === 'cable_raw');
+            let heads = state.inventory.filter(i => DB[i.dbId].type === 'head');
+
+            let html = `
+            <div class="max-w-2xl mx-auto bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
+                <h3 class="text-xl font-bold mb-4 text-center text-blue-400">สร้างสาย LAN เข้าหัว</h3>
+                <p class="text-sm text-slate-400 mb-6 text-center">มินิเกมทำสาย LAN ด้วยตัวเอง ประหยัดค่าเข้าหัวแต่ต้องใช้ฝีมือ</p>
+                
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label class="block text-sm mb-2 text-slate-300">เลือกสาย LAN ดิบ</label>
+                        <select id="sel-raw-cable" class="w-full bg-slate-900 border border-slate-600 p-2 rounded text-sm">
+                            ${rawCables.map(c => `<option value="${c.id}">${getFullItemInfo(c).title} (มี ${c.amount})</option>`).join('')}
+                            ${rawCables.length===0 ? '<option value="">ไม่มีสาย</option>':''}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-2 text-slate-300">เลือกหัว RJ45 (ใช้ 2 ชิ้น)</label>
+                        <select id="sel-head" class="w-full bg-slate-900 border border-slate-600 p-2 rounded text-sm">
+                            ${heads.filter(h=>h.amount>=2).map(h => `<option value="${h.id}">${getFullItemInfo(h).title} (มี ${h.amount})</option>`).join('')}
+                            ${heads.filter(h=>h.amount>=2).length===0 ? '<option value="">ไม่มีหัว (หรือน้อยกว่า 2)</option>':''}
+                        </select>
+                    </div>
+                </div>
+                <button onclick="startMinigame()" class="w-full bg-emerald-600 hover:bg-emerald-500 py-3 rounded-lg font-bold text-lg shadow-lg flex justify-center items-center gap-2">
+                    <i class="fas fa-play"></i> เริ่ม Mini Game
+                </button>
+            </div>`;
+            container.innerHTML = html;
+        }
+
+        function startMinigame() {
+            const rawId = document.getElementById('sel-raw-cable').value;
+            const headId = document.getElementById('sel-head').value;
+            if(!rawId || !headId) return showAlert('ผิดพลาด', 'ต้องมีสายดิบและหัว LAN อย่างน้อย 2 ชิ้น');
+
+            mgState = {
+                rawItem: state.inventory.find(i=>i.id === rawId),
+                headItem: state.inventory.find(i=>i.id === headId),
+                step: 1,
+                damage: 0,
+                wireOrder: [],
+            };
+
+            document.getElementById('modal-minigame').classList.remove('hidden');
+            renderMgStep();
+        }
+
+        function closeMinigame() {
+            document.getElementById('modal-minigame').classList.add('hidden');
+            renderShopContent();
+        }
+
+        function addMgDamage(amt) {
+            mgState.damage += amt;
+            document.getElementById('mg-damage').innerText = `${mgState.damage}%`;
+            if (mgState.damage >= 100) {
+                showAlert('สายพัง!', 'ทำพลาดมากเกินไป วัสดุเสียหาย', 'ตกลง', () => {
+                    removeInvItem(mgState.rawItem.id, 1);
+                    removeInvItem(mgState.headItem.id, 2); // lose heads too
+                    closeMinigame();
+                });
+            }
+        }
+
+        function renderMgStep() {
+            const area = document.getElementById('mg-area');
+            const inst = document.getElementById('mg-instruction');
+            const ind = document.getElementById('mg-step-indicator');
+            const btn = document.getElementById('mg-btn-action');
+            
+            ind.innerText = `Step ${mgState.step}/6`;
+            area.innerHTML = ''; btn.classList.add('hidden'); btn.onclick = null;
+
+            if (mgState.step === 1) { // 1. Cut
+                inst.innerText = "ขั้นที่ 1: กะระยะและตัดปลายสายให้ตรง กดที่จุดบนสายเพื่อตัด";
+                area.innerHTML = `
+                    <div class="relative w-4/5 h-16 bg-gray-600 rounded-l-full cursor-crosshair overflow-hidden border-4 border-r-0 border-gray-700" id="mg-cable" onclick="mgActionCut(event)">
+                        <div class="absolute inset-y-0 right-0 w-20 bg-gray-500 opacity-50 flex items-center justify-center text-xs">ส่วนปลาย</div>
+                    </div>`;
+            } 
+            else if (mgState.step === 2) { // 2. Strip
+                inst.innerText = "ขั้นที่ 2: ปอกสาย ลากเมาส์/นิ้ว ซ้าย-ขวา เพื่อปอกเปลือกนอกออก";
+                area.innerHTML = `
+                    <div class="w-4/5 h-16 bg-gray-600 relative select-none touch-none" id="mg-strip-area">
+                        <div class="absolute right-0 w-1/3 h-full bg-blue-900 border-l-2 border-blue-400 flex items-center justify-center text-xs" id="mg-strip-cover">
+                            ลากเพื่อปอก <i class="fas fa-arrows-alt-h ml-2"></i>
+                        </div>
+                    </div>`;
+                let cover = document.getElementById('mg-strip-cover');
+                let startX = 0, isDragging = false, offset = 0;
+                
+                const startDrag = (e) => { isDragging = true; startX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX; };
+                const moveDrag = (e) => {
+                    if(!isDragging) return;
+                    let curX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+                    offset += (curX - startX);
+                    startX = curX;
+                    if(offset > 50) { // Stripped
+                        isDragging = false;
+                        cover.style.display = 'none';
+                        mgState.step++; setTimeout(renderMgStep, 500);
+                    }
+                };
+                const endDrag = () => { isDragging = false; };
+                cover.addEventListener('mousedown', startDrag); cover.addEventListener('touchstart', startDrag, {passive:true});
+                document.addEventListener('mousemove', moveDrag); document.addEventListener('touchmove', moveDrag, {passive:true});
+                document.addEventListener('mouseup', endDrag); document.addEventListener('touchend', endDrag);
+                // Clean up listeners is handled by innerHTML replacement
+            }
+            else if (mgState.step === 3) { // 3. Untangle
+                inst.innerText = "ขั้นที่ 3: แยกสายสี คลิกที่คู่สายที่พันกันเพื่อคลายออก";
+                area.innerHTML = `<div class="flex gap-4" id="mg-untangle-box"></div>`;
+                let pairs = ['ส้ม', 'เขียว', 'ฟ้า', 'น้ำตาล'];
+                pairs.forEach((p, i) => {
+                    let d = document.createElement('div');
+                    d.className = "w-16 h-32 flex items-center justify-center rounded cursor-pointer transition transform hover:scale-105 border-2 border-dashed border-gray-500 text-xs text-center";
+                    d.style.background = `repeating-linear-gradient(45deg, ${getWireColor(p)}, ${getWireColor(p)} 10px, ${getWireColor('ขาว'+p)} 10px, ${getWireColor('ขาว'+p)} 20px)`;
+                    d.innerText = "คลิกคลาย";
+                    d.onclick = () => {
+                        d.style.background = 'transparent'; d.className = "w-16 h-32 flex flex-col gap-2";
+                        d.innerHTML = `<div class="flex-1 rounded" style="background:${getWireColor('ขาว'+p)}"></div><div class="flex-1 rounded" style="background:${getWireColor(p)}"></div>`;
+                        d.onclick = null;
+                        if(document.querySelectorAll('#mg-untangle-box .cursor-pointer').length === 0) {
+                            setTimeout(() => { mgState.step++; renderMgStep(); }, 800);
+                        }
+                    };
+                    document.getElementById('mg-untangle-box').appendChild(d);
+                });
+            }
+            else if (mgState.step === 4) { // 4. Cut Plastic
+                inst.innerText = "ขั้นที่ 4: ตัดแกนพลาสติกตรงกลาง กดลากมีดพาดผ่านแกน";
+                area.innerHTML = `
+                    <div class="relative w-32 h-32 border border-gray-600 rounded-full flex items-center justify-center overflow-hidden touch-none" id="mg-plastic-area">
+                        <div class="absolute w-full h-2 bg-gray-300 transform rotate-45 pointer-events-none" id="mg-plastic-core"></div>
+                    </div>`;
+                let box = document.getElementById('mg-plastic-area');
+                let startPos = null;
+                box.onpointerdown = (e) => { startPos = {x: e.clientX, y: e.clientY}; };
+                box.onpointerup = (e) => {
+                    if(!startPos) return;
+                    let dx = e.clientX - startPos.x;
+                    let dy = e.clientY - startPos.y;
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist > 50) { // swipe long enough
+                        document.getElementById('mg-plastic-core').style.display = 'none';
+                        setTimeout(() => { mgState.step++; renderMgStep(); }, 500);
+                    } else { addMgDamage(5); } // Bad cut
+                    startPos = null;
+                };
+            }
+            else if (mgState.step === 5) { // 5. Arrange (Drag & Drop emulation for mobile/PC)
+                inst.innerText = "ขั้นที่ 5: เรียงสายตามาตรฐาน T568B (ขาวส้ม, ส้ม, ขาวเขียว, ฟ้า, ขาวฟ้า, เขียว, ขาวน้ำตาล, น้ำตาล) แตะสายแล้วแตะช่องว่าง";
+                const colors = ['ขาวส้ม', 'ส้ม', 'ขาวเขียว', 'ฟ้า', 'ขาวฟ้า', 'เขียว', 'ขาวน้ำตาล', 'น้ำตาล'].sort(()=>Math.random()-0.5);
+                
+                let html = `<div class="flex flex-col w-full px-4 gap-6 max-w-lg">
+                    <div class="flex justify-between gap-1 h-24 bg-gray-700 p-2 rounded" id="mg-slots">`;
+                for(let i=0; i<8; i++) html += `<div class="flex-1 bg-gray-900 border border-gray-600 rounded mg-slot" data-idx="${i}"></div>`;
+                html += `</div>
+                    <div class="flex justify-between gap-1" id="mg-wires">`;
+                colors.forEach((c, i) => {
+                    html += `<div class="w-8 h-20 rounded border border-gray-400 mg-wire cursor-pointer shadow-md flex items-center justify-center text-[10px] text-black font-bold overflow-hidden text-center leading-tight" 
+                                style="background:${getWireColor(c)}" data-color="${c}">${c.replace('ขาว','ข-')}</div>`;
+                });
+                html += `</div></div>`;
+                area.innerHTML = html;
+
+                // Click to move logic (better than native D&D for mixed mobile/PC inside an iframe/single file)
+                let selectedWire = null;
+                document.querySelectorAll('.mg-wire').forEach(w => {
+                    w.onclick = (e) => {
+                        if(w.parentElement.id === 'mg-wires') {
+                            // Find first empty slot
+                            let slots = document.querySelectorAll('.mg-slot');
+                            for(let slot of slots) {
+                                if(slot.children.length === 0) {
+                                    slot.appendChild(w);
+                                    w.classList.add('w-full', 'h-full', 'mx-auto');
+                                    w.classList.remove('w-8', 'h-20');
+                                    checkArrangeComplete();
+                                    return;
+                                }
+                            }
+                        } else {
+                            // Move back
+                            document.getElementById('mg-wires').appendChild(w);
+                            w.classList.remove('w-full', 'h-full', 'mx-auto');
+                            w.classList.add('w-8', 'h-20');
+                            btn.classList.add('hidden');
+                        }
+                    }
+                });
+
+                function checkArrangeComplete() {
+                    let inSlots = document.querySelectorAll('.mg-slot .mg-wire');
+                    if(inSlots.length === 8) {
+                        btn.innerText = "ใส่หัว LAN";
+                        btn.classList.remove('hidden');
+                        btn.onclick = validateArrange;
+                    }
+                }
+
+                function validateArrange() {
+                    const correct = ['ขาวส้ม', 'ส้ม', 'ขาวเขียว', 'ฟ้า', 'ขาวฟ้า', 'เขียว', 'ขาวน้ำตาล', 'น้ำตาล'];
+                    let current = Array.from(document.querySelectorAll('.mg-slot .mg-wire')).map(w => w.getAttribute('data-color'));
+                    let isCorrect = true;
+                    for(let i=0; i<8; i++) if(correct[i] !== current[i]) isCorrect = false;
+
+                    if (isCorrect) {
+                        mgState.step++; renderMgStep();
+                    } else {
+                        addMgDamage(20);
+                        showAlert('เรียงผิด', 'ลำดับสายไม่ถูกต้อง กรุณาจัดใหม่ (T568B)');
+                        // Move back
+                        document.querySelectorAll('.mg-slot .mg-wire').forEach(w => {
+                            document.getElementById('mg-wires').appendChild(w);
+                            w.classList.remove('w-full', 'h-full', 'mx-auto'); w.classList.add('w-8', 'h-20');
+                        });
+                        btn.classList.add('hidden');
+                    }
+                }
+            }
+            else if (mgState.step === 6) { // 6. Success
+                inst.innerText = "สำเร็จ! เข้าหัว LAN เรียบร้อย";
+                area.innerHTML = `<div class="text-center"><i class="fas fa-check-circle text-6xl text-emerald-500 mb-4"></i><h3 class="text-2xl font-bold">สร้างสายเสร็จสิ้น</h3></div>`;
+                
+                btn.innerText = "รับสาย";
+                btn.classList.remove('hidden');
+                btn.onclick = () => {
+                    // Logic: min(cable, head) quality
+                    let resQ = Math.min(mgState.rawItem.q, mgState.headItem.q);
+                    
+                    // Deduct
+                    removeInvItem(mgState.rawItem.id, 1);
+                    removeInvItem(mgState.headItem.id, 2);
+                    
+                    // Add
+                    addInv('crimped_cable', resQ, mgState.rawItem.size, 1);
+                    saveState();
+                    
+                    showAlert('สร้างสายสำเร็จ', `ได้สาย LAN เข้าหัวขนาด ${mgState.rawItem.size} เมตร\nระดับคุณภาพ: ${QUALITIES[resQ].name}`, 'ตกลง', closeMinigame);
+                };
+            }
+        }
+
+        function mgActionCut(e) {
+            let rect = e.currentTarget.getBoundingClientRect();
+            let x = e.clientX - rect.left;
+            let percent = x / rect.width;
+            
+            // Aim for 80-95%
+            if (percent > 0.8 && percent < 0.95) {
+                // Success cut visual
+                e.currentTarget.style.width = `${percent*100}%`;
+                setTimeout(() => { mgState.step++; renderMgStep(); }, 500);
+            } else {
+                addMgDamage(10);
+                // Shake effect
+                e.currentTarget.classList.add('transform', '-translate-x-2');
+                setTimeout(()=>e.currentTarget.classList.remove('-translate-x-2'), 100);
+            }
+        }
+
+        function getWireColor(c) {
+            const m = {'ส้ม':'#f97316', 'เขียว':'#22c55e', 'ฟ้า':'#3b82f6', 'น้ำตาล':'#78350f', 'ขาวส้ม':'#ffedd5', 'ขาวเขียว':'#dcfce7', 'ขาวฟ้า':'#dbeafe', 'ขาวน้ำตาล':'#f3e8ff'}; // using distinct light colors for mixed
+            if(c.startsWith('ขาว')) return `repeating-linear-gradient(45deg, white, white 5px, ${m[c.replace('ขาว','')]} 5px, ${m[c.replace('ขาว','')]} 10px)`;
+            return m[c];
+        }
+
+        // --- STREAMING_CHUNK:Level Generation & Game Board Setup ---
+        const LEVELS = [
+            { target: 3000, maxFloors: 1, name: 'ด่านง่าย' },
+            { target: 6000, maxFloors: 3, name: 'ด่านกลาง' },
+            { target: 12000, maxFloors: 4, name: 'ด่านยาก' }
+        ];
+
+        function startLevel(diffIdx) {
+            game = {
+                active: true, difficulty: diffIdx, targetScore: LEVELS[diffIdx].target,
+                nodes: [], cables: [], tool: 'place', selectedNodeId: null, selectedInventoryIdx: null
+            };
+            generateBoard(diffIdx);
+            showScreen('game');
+            updateGameUI();
+        }
+
+        function generateBoard(diffIdx) {
+            const container = document.getElementById('game-board-container');
+            // Clear existing except SVG
+            Array.from(container.children).forEach(c => { if(c.tagName !== 'svg') c.remove(); });
+            document.getElementById('cables-svg').innerHTML = '<defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#60a5fa" /></marker></defs>';
+            
+            const config = LEVELS[diffIdx];
+            let floors = diffIdx === 0 ? 1 : diffIdx === 1 ? Math.floor(Math.random()*2)+2 : Math.floor(Math.random()*3)+2;
+            
+            // Build rooms (Visual walls). Grid is 40x40. Container is 1200x1200 (30x30 grid).
+            let yOffset = 2;
+            let reqPCs = diffIdx === 0 ? 10 : diffIdx === 1 ? 25 : 50;
+            let reqPhones = diffIdx === 0 ? 15 : diffIdx === 1 ? 30 : 60;
+            
+            // Add Internet Node (Root)
+            addNodeToBoard('internet', 14, 0, null);
+
+            for (let f = 0; f < floors; f++) {
+                let w = 24, h = 6;
+                let startX = 3;
+                
+                // Draw Wall Outline for floor
+                let wallEl = document.createElement('div');
+                wallEl.className = 'node-wall border-4 border-slate-500 bg-slate-800 bg-opacity-30';
+                wallEl.style.left = `${startX*40}px`; wallEl.style.top = `${yOffset*40}px`;
+                wallEl.style.width = `${w*40}px`; wallEl.style.height = `${h*40}px`;
+                wallEl.style.zIndex = 1;
+                container.appendChild(wallEl);
+
+                // Add random devices in this floor
+                let pcInFloor = Math.floor(reqPCs / floors);
+                let phoneInFloor = Math.floor(reqPhones / floors);
+
+                for(let i=0; i<pcInFloor; i++) {
+                    addNodeToBoard('pc', startX + 1 + Math.floor(Math.random()*(w-2)), yOffset + 1 + Math.floor(Math.random()*(h-2)));
+                }
+                for(let i=0; i<phoneInFloor; i++) {
+                    addNodeToBoard('phone', startX + 1 + Math.floor(Math.random()*(w-2)), yOffset + 1 + Math.floor(Math.random()*(h-2)));
+                }
+
+                yOffset += h + 2;
+            }
+        }
+
+        function addNodeToBoard(type, gridX, gridY, invItem = null) {
+            let id = 'node_' + generateId();
+            let node = { id, type, x: gridX, y: gridY, portsTotal: 0, portsUsed: 0, data: {} };
+            
+            if (type === 'pc') node.portsTotal = 1;
+            else if (type === 'router') { node.portsTotal = 5; node.data = { maxDev: DB[invItem.dbId].maxDev[invItem.q], maxSpeed: DB[invItem.dbId].maxSpeed[invItem.q] }; }
+            else if (type === 'switch') { 
+                let cfg = DB[invItem.dbId].configs.find(c => `${c.p}+${c.u}` === invItem.size);
+                node.portsTotal = cfg ? cfg.p + cfg.u : 8; 
+            }
+            else if (type === 'ap') { node.portsTotal = 1; node.data = { maxUsers: DB[invItem.dbId].maxUsersBase * QUALITIES[invItem.q].multi }; }
+            else if (type === 'internet') { node.portsTotal = 99; }
+            else if (type === 'phone') { node.portsTotal = 0; } // Wireless
+
+            if(invItem) node.invRef = invItem;
+
+            game.nodes.push(node);
+            renderNodeDOM(node);
+        }
+
+        function renderNodeDOM(node) {
+            const container = document.getElementById('game-board-container');
+            let el = document.createElement('div');
+            el.id = node.id;
+            el.className = `game-node node-${node.type}`;
+            el.style.left = `${node.x * 40}px`;
+            el.style.top = `${node.y * 40}px`;
+
+            if (node.type === 'pc') el.innerHTML = '<i class="fas fa-desktop text-white"></i>';
+            else if (node.type === 'phone') el.innerHTML = '<i class="fas fa-mobile-alt text-white text-xs"></i>';
+            else if (node.type === 'router') el.innerHTML = '<i class="fas fa-server text-white"></i>';
+            else if (node.type === 'switch') el.innerHTML = '<i class="fas fa-network-wired text-white"></i>';
+            else if (node.type === 'ap') el.innerHTML = '<i class="fas fa-wifi text-white"></i>';
+            else if (node.type === 'internet') el.innerHTML = '<i class="fas fa-globe text-white"></i>';
+
+            if (node.portsTotal > 0 && node.type !== 'internet') {
+                el.innerHTML += `<div class="badge" id="badge-${node.id}">0/${node.portsTotal}</div>`;
+            }
+            
+            if(node.invRef) {
+                // Add border color based on quality
+                el.style.borderColor = `var(--qual-${['standard','good','high','premium'][node.invRef.q]}-border)`;
+            }
+
+            el.onclick = (e) => handleNodeClick(node.id, e);
+            container.appendChild(el);
+            node.el = el;
+        }
+
+        // --- STREAMING_CHUNK:Game Tools & Interactions ---
+        function setTool(t) {
+            game.tool = t;
+            ['tool-place', 'tool-wire', 'tool-delete'].forEach(id => document.getElementById(id).classList.replace('bg-blue-600', 'bg-slate-700'));
+            document.getElementById(`tool-${t}`).classList.replace('bg-slate-700', 'bg-blue-600');
+            game.selectedNodeId = null;
+            document.getElementById('connection-ui').classList.add('hidden');
+        }
+
+        function updateGameUI() {
+            document.getElementById('game-target-score').innerText = `${game.targetScore.toLocaleString()} pts`;
+            
+            // Render Inventory Panel
+            const list = document.getElementById('game-inventory-list');
+            list.innerHTML = '';
+            let placeables = state.inventory.filter(i => ['router', 'switch', 'ap'].includes(DB[i.dbId].type));
+            
+            placeables.forEach((item, idx) => {
+                const info = getFullItemInfo(item);
+                let d = document.createElement('div');
+                d.className = `p-2 rounded cursor-pointer border ${info.qClass} ${game.selectedInventoryIdx === idx ? 'ring-2 ring-blue-500 scale-105' : ''}`;
+                d.innerHTML = `<div class="font-bold text-xs flex justify-between"><span>${info.title}</span> <span>x${item.amount}</span></div>`;
+                d.onclick = () => {
+                    setTool('place');
+                    game.selectedInventoryIdx = idx;
+                    updateGameUI();
+                };
+                list.appendChild(d);
+            });
+        }
+
+        // Handle clicking on grid or node
+        document.getElementById('game-board-container').onclick = (e) => {
+            if (e.target.id === 'game-board-container' && game.tool === 'place' && game.selectedInventoryIdx !== null) {
+                // Place item
+                let item = state.inventory[game.selectedInventoryIdx];
+                if(item.amount <= 0) return;
+                
+                let rect = e.target.getBoundingClientRect();
+                // Get click relative to container
+                let x = (e.clientX - rect.left);
+                let y = (e.clientY - rect.top);
+                // Snap to 40px grid
+                let gridX = Math.floor(x / 40);
+                let gridY = Math.floor(y / 40);
+
+                addNodeToBoard(DB[item.dbId].type, gridX, gridY, item);
+                removeInvItem(item.id, 1);
+                updateGameUI();
+            }
+        };
+
+        function handleNodeClick(nodeId, e) {
+            e.stopPropagation();
+            const node = game.nodes.find(n => n.id === nodeId);
+            
+            if (game.tool === 'delete') {
+                if (['pc', 'phone', 'internet'].includes(node.type)) return showAlert('ผิดพลาด', 'ไม่สามารถลบอุปกรณ์พื้นฐานของด่านได้');
+                // Remove connected cables
+                let cablesToRemove = game.cables.filter(c => c.node1 === nodeId || c.node2 === nodeId);
+                cablesToRemove.forEach(c => {
+                    // return cable to inv
+                    addInv('crimped_cable', c.item.q, c.item.size, 1);
+                    removeCable(c.id);
+                });
+                // Return node to inv
+                addInv(node.invRef.dbId, node.invRef.q, node.invRef.size, 1);
+                // Remove DOM and data
+                node.el.remove();
+                game.nodes = game.nodes.filter(n => n.id !== nodeId);
+                updateGameUI();
+            }
+            else if (game.tool === 'wire') {
+                if(node.type === 'phone') return showAlert('ผิดพลาด', 'มือถือเชื่อมต่อผ่าน Wi-Fi ไม่สามารถเสียบสาย LAN ได้');
+                
+                if (!game.selectedNodeId) {
+                    game.selectedNodeId = nodeId;
+                    node.el.classList.add('ring-4', 'ring-blue-500');
+                } else {
+                    if (game.selectedNodeId === nodeId) {
+                        node.el.classList.remove('ring-4', 'ring-blue-500');
+                        game.selectedNodeId = null;
+                        return;
+                    }
+                    // Show wire selection UI
+                    showConnectionUI(game.selectedNodeId, nodeId);
+                }
+            }
+        }
+
+        function showConnectionUI(n1Id, n2Id) {
+            const ui = document.getElementById('connection-ui');
+            const list = document.getElementById('connection-cables-list');
+            ui.classList.remove('hidden');
+            
+            let n1 = game.nodes.find(n=>n.id === n1Id);
+            let n2 = game.nodes.find(n=>n.id === n2Id);
+            document.getElementById('connection-nodes-info').innerText = `${n1.type.toUpperCase()} ➔ ${n2.type.toUpperCase()}`;
+            
+            // Check port availability
+            if(n1.portsUsed >= n1.portsTotal || n2.portsUsed >= n2.portsTotal) {
+                list.innerHTML = '<div class="text-red-400 text-sm text-center">พอร์ตเต็ม ไม่สามารถต่อได้</div>';
+                return;
+            }
+
+            // Calculate distance (Manhattan approx mapped to meters, scale: 1 grid = 1 meter for simplicity)
+            let dist = Math.ceil(Math.abs(n1.x - n2.x) + Math.abs(n1.y - n2.y));
+            
+            let cables = state.inventory.filter(i => DB[i.dbId].type === 'cable_ready' && i.size >= dist);
+            
+            if(cables.length === 0) {
+                list.innerHTML = `<div class="text-red-400 text-sm text-center">ไม่มีสาย LAN ที่ยาวพอ (ต้องการ ${dist}m+)</div>`;
+                return;
+            }
+
+            list.innerHTML = `<div class="text-xs text-emerald-400 mb-1">ระยะห่าง: ~${dist} เมตร</div>`;
+            cables.forEach(c => {
+                const info = getFullItemInfo(c);
+                list.innerHTML += `
+                    <button onclick="confirmConnect('${n1Id}', '${n2Id}', '${c.id}')" class="w-full text-left p-2 rounded ${info.qClass} hover:opacity-80 transition text-xs mb-1 shadow">
+                        ${info.title} <span class="float-right">x${c.amount}</span>
+                    </button>`;
+            });
+        }
+
+        function cancelConnection() {
+            document.getElementById('connection-ui').classList.add('hidden');
+            if(game.selectedNodeId) {
+                let n = game.nodes.find(node=>node.id === game.selectedNodeId);
+                if(n && n.el) n.el.classList.remove('ring-4', 'ring-blue-500');
+            }
+            game.selectedNodeId = null;
+        }
+
+        function confirmConnect(n1Id, n2Id, invId) {
+            let invItem = state.inventory.find(i => i.id === invId);
+            removeInvItem(invId, 1);
+            
+            let cableId = 'cable_' + generateId();
+            let cItem = { q: invItem.q, size: invItem.size };
+            game.cables.push({ id: cableId, node1: n1Id, node2: n2Id, item: cItem });
+            
+            // Update ports
+            let n1 = game.nodes.find(n=>n.id === n1Id); let n2 = game.nodes.find(n=>n.id === n2Id);
+            n1.portsUsed++; n2.portsUsed++;
+            updateNodeBadge(n1); updateNodeBadge(n2);
+            
+            drawCable(cableId, n1, n2, cItem);
+            
+            cancelConnection();
+            updateGameUI();
+        }
+
+        function updateNodeBadge(node) {
+            let b = document.getElementById(`badge-${node.id}`);
+            if(b) b.innerText = `${node.portsUsed}/${node.portsTotal}`;
+        }
+
+        function removeCable(id) {
+            let c = game.cables.find(cb => cb.id === id);
+            let n1 = game.nodes.find(n=>n.id === c.node1);
+            let n2 = game.nodes.find(n=>n.id === c.node2);
+            if(n1) { n1.portsUsed--; updateNodeBadge(n1); }
+            if(n2) { n2.portsUsed--; updateNodeBadge(n2); }
+            
+            game.cables = game.cables.filter(cb => cb.id !== id);
+            let svgLine = document.getElementById(id);
+            if(svgLine) svgLine.remove();
+        }
+
+        function drawCable(id, n1, n2, item) {
+            const svg = document.getElementById('cables-svg');
+            let line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            line.setAttribute("id", id);
+            // Center of node (40x40, so +20)
+            line.setAttribute("x1", n1.x * 40 + 20); line.setAttribute("y1", n1.y * 40 + 20);
+            line.setAttribute("x2", n2.x * 40 + 20); line.setAttribute("y2", n2.y * 40 + 20);
+            
+            let colors = ['#9ca3af', '#a855f7', '#eab308', '#ef4444'];
+            line.setAttribute("stroke", colors[item.q]);
+            line.setAttribute("stroke-width", "3");
+            line.setAttribute("class", "cable-line");
+            if(n2.type !== 'internet') line.setAttribute("marker-end", "url(#arrowhead)");
+            
+            svg.appendChild(line);
+        }
+
+        function abandonLevel() {
+            showAlert('ยืนยันออก', 'คุณต้องการออกจากด่านนี้หรือไม่? อุปกรณ์ที่วางไว้จะถือว่าสูญหายไปบางส่วน และไม่ได้รางวัล', 'ออก', () => {
+                showScreen('level-select');
+            }, 'ยกเลิก');
+        }
+
+        // --- STREAMING_CHUNK:Network Calculation & Score Engine ---
+        function testNetwork() {
+            // Complex Graph Traversal and Bandwidth calculation
+            const result = { logs: [], score: 0, connectedPCs: 0, connectedPhones: 0, validNetwork: false, failReason: '' };
+            
+            // 1. Find Internet node & Router
+            let intNode = game.nodes.find(n => n.type === 'internet');
+            let intCables = game.cables.filter(c => c.node1 === intNode.id || c.node2 === intNode.id);
+            
+            if (intCables.length === 0) return showResult({failReason: 'ไม่ได้เชื่อมต่อ Internet เข้ากับ Router'});
+            
+            let routerNode = null;
+            for(let c of intCables) {
+                let otherId = c.node1 === intNode.id ? c.node2 : c.node1;
+                let otherNode = game.nodes.find(n=>n.id === otherId);
+                if(otherNode && otherNode.type === 'router') { routerNode = otherNode; break; }
+            }
+
+            if (!routerNode) return showResult({failReason: 'ต้องมี Router เชื่อมต่อกับ Internet โดยตรง'});
+
+            let rMaxSpeed = routerNode.data.maxSpeed;
+            let rMaxDev = routerNode.data.maxDev;
+            result.logs.push(`<div class="text-blue-400">Router ความเร็วสูงสุด: ${rMaxSpeed} Mbps | รับอุปกรณ์ได้: ${rMaxDev} เครื่อง</div>`);
+
+            // 2. Build Adjacency List for BFS
+            let adj = {};
+            game.nodes.forEach(n => adj[n.id] = []);
+            game.cables.forEach(c => {
+                adj[c.node1].push({to: c.node2, speedLimit: CABLE_SPEEDS[c.item.q]});
+                adj[c.node2].push({to: c.node1, speedLimit: CABLE_SPEEDS[c.item.q]});
+            });
+
+            // 3. Find all reachable devices and bottlenecks
+            let visited = new Set();
+            let queue = [{id: routerNode.id, pathLimit: rMaxSpeed}];
+            visited.add(routerNode.id);
+            visited.add(intNode.id); // don't go back
+
+            let devices = []; // PCs and APs
+            let apNodes = [];
+
+            while (queue.length > 0) {
+                let curr = queue.shift();
+                let n = game.nodes.find(node=>node.id === curr.id);
+
+                if (n.type === 'pc') {
+                    devices.push({node: n, availableSpeed: curr.pathLimit});
+                    result.connectedPCs++;
+                } else if (n.type === 'ap') {
+                    apNodes.push({node: n, availableSpeed: curr.pathLimit});
+                }
+
+                adj[curr.id].forEach(edge => {
+                    if (!visited.has(edge.to)) {
+                        visited.add(edge.to);
+                        // Speed logic: min of current path limit, cable limit, and node limit (like switch limit if implemented, but we use cable limits as primary bottlenecks for switches)
+                        let newLimit = Math.min(curr.pathLimit, edge.speedLimit);
+                        queue.push({id: edge.to, pathLimit: newLimit});
+                    }
+                });
+            }
+
+            // 4. Handle Phones (Wireless connect to APs)
+            let allPhones = game.nodes.filter(n => n.type === 'phone');
+            let phoneConnections = []; // map phone to AP
+            
+            allPhones.forEach(phone => {
+                // Find nearest AP
+                let nearestAP = null;
+                let minDist = Infinity;
+                apNodes.forEach(ap => {
+                    let dist = Math.abs(phone.x - ap.node.x) + Math.abs(phone.y - ap.node.y);
+                    // Assume AP range is ~15 units
+                    if (dist < 15 && dist < minDist) { minDist = dist; nearestAP = ap; }
+                });
+                if (nearestAP) {
+                    phoneConnections.push({phone: phone, ap: nearestAP});
+                }
+            });
+
+            // Count total devices hitting Router
+            let totalDev = devices.length + phoneConnections.length;
+            if (totalDev > rMaxDev) {
+                return showResult({failReason: `อุปกรณ์ในระบบ (${totalDev} เครื่อง) เกินขีดจำกัดของ Router (${rMaxDev} เครื่อง)`});
+            }
+
+            // 5. Calculate Actual Speeds and Scores
+            let score = 0;
+
+            // Simple bandwidth sharing model: 
+            // In a real network, bandwidth is dynamic. Here, we'll assume the Router's max speed is divided by total active demand, 
+            // but capped by individual path bottlenecks.
+            // For puzzle logic: If sum of needed bandwidth > router bandwidth, everyone suffers.
+            
+            // For simplicity in this game: 
+            // PC gets full bottleneck path limit (usually limited by cable/switch path).
+            // AP divides its arriving bandwidth by number of connected phones.
+            
+            devices.forEach(d => {
+                let speed = d.availableSpeed;
+                // Penalize if too many devices overall
+                let scale = Math.min(1, rMaxSpeed / Math.max(1, totalDev * 5)); // Assume each needs ~5Mbps
+                speed = speed * scale;
+
+                let points = 0;
+                let status = 'Low'; let col = 'text-red-400';
+                if (speed >= SPEED.pc.high) { points = SCORE.pcBase + SCORE.pcHigh; status = 'High'; col='text-emerald-400'; }
+                else if (speed >= SPEED.pc.med) { points = SCORE.pcBase + SCORE.pcMed; status = 'Med'; col='text-yellow-400'; }
+                else { points = SCORE.pcBase; }
+                
+                // Bonus if getting router max
+                if(speed >= rMaxSpeed * 0.8) points += SCORE.pcMax;
+
+                score += points;
+                result.logs.push(`<div><i class="fas fa-desktop"></i> PC รับได้: <span class="${col}">${speed.toFixed(1)} Mbps</span> (+${points} pts)</div>`);
+            });
+
+            apNodes.forEach(ap => {
+                let connPhones = phoneConnections.filter(p => p.ap.node.id === ap.node.id);
+                let apMaxUsers = ap.node.data.maxUsers;
+                
+                if(connPhones.length > apMaxUsers) {
+                    result.logs.push(`<div class="text-red-400"><i class="fas fa-exclamation-triangle"></i> AP รับโหลดเกิน! (รับได้ ${apMaxUsers}, มี ${connPhones.length}) สัญญาณจะแย่มาก</div>`);
+                }
+
+                let speedPerPhone = connPhones.length > 0 ? (ap.availableSpeed / connPhones.length) : 0;
+                // Penalty for overloading AP
+                if(connPhones.length > apMaxUsers) speedPerPhone *= 0.1;
+
+                connPhones.forEach(cp => {
+                    let points = 0;
+                    let status = 'Low'; let col = 'text-red-400';
+                    if (speedPerPhone >= SPEED.mobile.high) { points = SCORE.phoneBase + SCORE.phoneHigh; status = 'High'; col='text-emerald-400'; }
+                    else if (speedPerPhone >= SPEED.mobile.med) { points = SCORE.phoneBase + SCORE.phoneMed; status = 'Med'; col='text-yellow-400'; }
+                    else { points = SCORE.phoneBase; }
+
+                    score += points;
+                    result.connectedPhones++;
+                });
+                if(connPhones.length > 0) {
+                     result.logs.push(`<div><i class="fas fa-wifi"></i> AP กระจายให้ ${connPhones.length} เครื่อง: เครื่องละ <span class="text-blue-300">${speedPerPhone.toFixed(1)} Mbps</span></div>`);
+                }
+            });
+
+            result.validNetwork = true;
+            result.score = score;
+            showResult(result);
+        }
+
+        function showResult(r) {
+            const modal = document.getElementById('modal-results');
+            const title = document.getElementById('result-title');
+            const details = document.getElementById('result-details');
+            const money = document.getElementById('result-money');
+            const retry = document.getElementById('btn-result-retry');
+
+            if (!r.validNetwork) {
+                title.innerText = "ตรวจสอบพบปัญหา";
+                title.className = "text-3xl font-extrabold text-red-500";
+                details.innerHTML = `<div class="bg-red-900 bg-opacity-50 p-4 rounded text-red-200 border border-red-700">
+                    <i class="fas fa-times-circle text-xl mb-2"></i><br>${r.failReason}</div>`;
+                money.innerText = "+0";
+                retry.classList.remove('hidden');
+            } else {
+                let passed = r.score >= game.targetScore;
+                title.innerText = passed ? "ผ่านด่านสำเร็จ!" : "ยังไม่ถึงเป้าหมาย";
+                title.className = `text-3xl font-extrabold ${passed ? 'text-emerald-400' : 'text-orange-400'}`;
+                
+                let html = `<div class="text-center text-xl mb-4">คะแนน: <span class="font-bold ${passed ? 'text-emerald-400':'text-red-400'}">${r.score.toLocaleString()}</span> / ${game.targetScore.toLocaleString()}</div>`;
+                html += `<div class="grid grid-cols-2 gap-2 text-sm mb-4">
+                    <div class="bg-slate-700 p-2 rounded text-center">PCs ออนไลน์: <span class="font-bold text-white">${r.connectedPCs}</span></div>
+                    <div class="bg-slate-700 p-2 rounded text-center">Phones ออนไลน์: <span class="font-bold text-white">${r.connectedPhones}</span></div>
+                </div>`;
+                html += `<div class="space-y-1 bg-slate-900 p-3 rounded h-40 overflow-y-auto font-mono text-xs">${r.logs.join('')}</div>`;
+                details.innerHTML = html;
+
+                if (passed) {
+                    let reward = game.difficulty === 0 ? 1000 : game.difficulty === 1 ? 2500 : 6000;
+                    money.innerText = `+${reward.toLocaleString()}`;
+                    state.money += reward;
+                    state.unlockedLevels = Math.max(state.unlockedLevels, game.difficulty + 2);
+                    saveState();
+                    retry.classList.add('hidden');
+                } else {
+                    money.innerText = "+0";
+                    retry.classList.remove('hidden');
+                }
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function restartLevel() {
+            document.getElementById('modal-results').classList.add('hidden');
+        }
+
+        function exitLevel() {
+            document.getElementById('modal-results').classList.add('hidden');
+            game.active = false;
+            showScreen('level-select');
+        }
+
+    </script>
+</body>
+</html>
